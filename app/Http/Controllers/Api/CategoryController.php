@@ -50,9 +50,9 @@ class CategoryController extends Controller
 
     public function destroy(Category $category): JsonResponse
     {
-        $category->delete();
+        $category->forceDelete();
 
-        return ApiFormatter::success(null, 'Category deleted.');
+        return ApiFormatter::success(null, 'Category permanently deleted.');
     }
 
     private function rules(?Category $category = null, bool $partial = false): array

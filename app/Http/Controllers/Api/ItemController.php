@@ -56,7 +56,7 @@ class ItemController extends Controller
 
     public function destroy(Item $item): JsonResponse
     {
-        $item->delete();
+        $item->forceDelete();
 
         return ApiFormatter::success(null, 'Item deleted.');
     }

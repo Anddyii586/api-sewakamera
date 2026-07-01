@@ -129,9 +129,9 @@ class RentalController extends Controller
 
     public function destroy(Rental $rental): JsonResponse
     {
-        $rental->delete();
+        $rental->forceDelete();
 
-        return ApiFormatter::success(null, 'Rental deleted.');
+        return ApiFormatter::success(null, 'Rental permanently deleted.');
     }
 
     private function updateStatus(Rental $rental, string $status, string $message): JsonResponse
