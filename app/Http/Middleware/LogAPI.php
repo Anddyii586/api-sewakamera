@@ -101,7 +101,7 @@ class LogAPI
             return ApiFormatter::error('Forbidden.', 403);
         }
 
-        if ($e instanceof ModelNotFoundException) {
+        if ($e instanceof ModelNotFoundException || $e->getPrevious() instanceof ModelNotFoundException) {
             return ApiFormatter::error('Resource not found.', 404);
         }
 
