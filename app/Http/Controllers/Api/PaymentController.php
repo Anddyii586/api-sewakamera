@@ -32,7 +32,9 @@ class PaymentController extends Controller
         }
 
         $validated = $validator->validated();
-        $rental = Rental::with('payment')->findOrFail($validated['rental_id']);
+        $rental = Rental::with([
+            'payment' => fn ($query) => $query->withTrashed(),
+        ])->findOrFail($validated['rental_id']);
 
         if ($rental->payment) {
             return ApiFormatter::error('Payment already exists for this rental.', 400);
@@ -86,16 +88,16 @@ class PaymentController extends Controller
 
     public function destroy(Payment $payment): JsonResponse
     {
-        $payment->delete();
+        $payment->forceDelete();
 
-        return ApiFormatter::success(null, 'Payment deleted.');
+        return ApiFormatter::success(null, 'Payment permanently deleted.');
     }
 
     private function uniquePaymentCode(): string
     {
         do {
             $code = 'PAY-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
-        } while (Payment::query()->where('payment_code', $code)->exists());
+        } while (Payment::withTrashed()->where('payment_code', $code)->exists());
 
         return $code;
     }

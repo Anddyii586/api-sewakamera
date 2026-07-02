@@ -6,14 +6,12 @@ use App\Helpers\ApiFormatter;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\Rental;
-use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 class RentalController extends Controller
 {
@@ -25,11 +23,13 @@ class RentalController extends Controller
         );
     }
 
-    public function myRentals(): JsonResponse
+    public function myRentals(Request $request): JsonResponse
     {
+        $userId = (int) $request->user()->getAuthIdentifier();
+
         return ApiFormatter::success(
             Rental::with(['details.item', 'payment'])
-                ->where('user_id', $this->user()->id)
+                ->where('user_id', $userId)
                 ->latest()
                 ->get(),
             'My rentals retrieved.',
@@ -51,13 +51,15 @@ class RentalController extends Controller
         }
 
         $validated = $validator->validated();
+        $userId = (int) $request->user()->getAuthIdentifier();
         $startDate = CarbonImmutable::parse($validated['start_date'])->startOfDay();
         $endDate = CarbonImmutable::parse($validated['end_date'])->startOfDay();
         $totalDays = max(1, (int) $startDate->diffInDays($endDate) + 1);
         $quantities = collect($validated['items'])
             ->groupBy('item_id')
             ->map(fn ($rows) => array_sum(array_column($rows->all(), 'quantity')));
-        $items = Item::query()->whereIn('id', $quantities->keys())->get()->keyBy('id');
+        $itemIds = $quantities->keys()->map(fn ($itemId) => (int) $itemId)->all();
+        $items = Item::query()->findMany($itemIds)->keyBy('id');
         $details = [];
         $totalPrice = 0;
 
@@ -83,9 +85,9 @@ class RentalController extends Controller
             ];
         }
 
-        $rental = DB::transaction(function () use ($validated, $details, $totalDays, $totalPrice) {
+        $rental = DB::transaction(function () use ($validated, $details, $totalDays, $totalPrice, $userId) {
             $rental = Rental::create([
-                'user_id' => $this->user()->id,
+                'user_id' => $userId,
                 'rental_code' => $this->uniqueRentalCode(),
                 'start_date' => $validated['start_date'],
                 'end_date' => $validated['end_date'],
@@ -145,13 +147,8 @@ class RentalController extends Controller
     {
         do {
             $code = 'RENT-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
-        } while (Rental::query()->where('rental_code', $code)->exists());
+        } while (Rental::withTrashed()->where('rental_code', $code)->exists());
 
         return $code;
-    }
-
-    private function user(): User
-    {
-        return JWTAuth::parseToken()->authenticate();
     }
 }
